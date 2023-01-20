@@ -12,6 +12,11 @@ byte pinList[numPins] = {2};
 const int ledsPerStrip = 512;
 const int bytesPerLED = 3;
 
+int rows = 8;
+int cols = ledsPerStrip / 8;
+
+int offset = 0;
+
 DMAMEM int displayMemory[ledsPerStrip * numPins * bytesPerLED / 4];
 int drawingMemory[ledsPerStrip * numPins * bytesPerLED / 4];
 
@@ -23,8 +28,46 @@ OctoWS2811 leds(ledsPerStrip, displayMemory, drawingMemory, config, numPins, pin
 char serialBuffer[256];
 byte serialBufferIndex = 0;
 
-char textBuffer[256] = "ABCDEFGH";
-char textBufferLength = 8;
+char fontColumns[256 * 8];
+byte fontColumnIndex = 0;
+
+void processBuffer(char *buffer, int length)
+{
+  fontColumnIndex = 0;
+
+  for (byte i = 0; i < length; i++)
+  {
+    // Grab letter from buffer;
+    char letter = buffer[i];
+
+    // Change letter into font data index.
+    char index = letter & 0x7F;
+    if (index < ' ')
+    {
+      index = 0;
+    }
+    else
+    {
+      index -= ' ';
+    }
+
+    // Lookup font data.
+    const unsigned char *fontData = &font[index][0];
+
+    // Sample font columns;
+    for (byte x = 0; x < CHAR_WIDTH; x++)
+    {
+      fontColumns[fontColumnIndex] = fontData[x];
+      fontColumnIndex++;
+    }
+  }
+
+  Serial.println(fontColumnIndex);
+  for (int i = 0; i < fontColumnIndex; i++)
+  {
+    Serial.println(fontColumns[i], HEX);
+  }
+}
 
 void setup()
 {
@@ -33,15 +76,19 @@ void setup()
 
   leds.begin();
   leds.show();
+
+  processBuffer("ABCDEFGH", 8);
+
+  for (int i = 0; i < ledsPerStrip; i++)
+  {
+    leds.setPixel(i, 0xffffff);
+  }
+  leds.show();
 }
-
-int rows = 8;
-int cols = ledsPerStrip / 8;
-
-int offset = 0;
 
 void loop()
 {
+  return;
   // Serial
 
   while (Serial.available() > 0)
@@ -54,85 +101,39 @@ void loop()
     }
     else
     {
-      byte length = serialBufferIndex;
-
-      memcpy(textBuffer, serialBuffer, length);
-      textBufferLength = length;
-
-      Serial.write(textBuffer, textBufferLength);
-      Serial.write('\n');
-
+      byte length = serialBufferIndex - 1;
+      processBuffer(serialBuffer, length);
       serialBufferIndex = 0;
     }
   }
 
   //
 
-  for (byte i = 0; i < textBufferLength; i++)
+  for (byte x = 0; x < cols; x++)
   {
-    char letter = textBuffer[i];
+    int column = (x + offset) % fontColumnIndex;
+    char fontColumn = fontColumns[column];
 
-    char index = letter & 0x7F;
-    if (index < ' ')
+    for (byte y = 0; y < CHAR_HEIGHT; y++)
     {
-      index = 0;
-    }
-    else
-    {
-      index -= ' ';
-    }
 
-    const unsigned char *letterData = &font[index][0];
+      int pixelIndex = (x * rows) + ((x % 2 == 0) ? y : 7 - y);
 
-    // Serial.print("Letter: ");
-    // Serial.println(letter);
-
-    // Serial.print("Index: ");
-    // Serial.println(index * CHAR_WIDTH);
-
-    // Serial.println(font[33][0], HEX);
-
-    for (byte x = 0; x < CHAR_WIDTH; x++)
-    {
-      //          Serial.println(letterData[x], BIN);
-
-      for (byte y = 0; y < CHAR_HEIGHT; y++)
+      if (fontColumn & (1 << y))
       {
-
-        int pixelX = ((x + (i * CHAR_WIDTH)) + offset) % cols;
-        int pixelIndex = (pixelX * rows) + ((pixelX % 2 == 0) ? y : 7 - y);
-
-        if (letterData[x] & (1 << y))
-        {
-          leds.setPixel(pixelIndex, 0x040404);
-          // Serial.print("1");
-        }
-        else
-        {
-          // Serial.print("0");
-          leds.setPixel(pixelIndex, 0x000000);
-        }
+        leds.setPixel(pixelIndex, 0x040404);
+        // Serial.print("1");
       }
-      // Serial.println("");
+      else
+      {
+        // Serial.print("0");
+        leds.setPixel(pixelIndex, 0x000000);
+      }
     }
-
-    // Serial.print(letter);
+    // Serial.println("");
   }
-  // Serial.println("!");
 
-  //  for (int x = 0; x < cols; x++) {
-  //    for (int y = 0; y < rows; y++) {
-  //      int i = (x * rows) + y;
-  //
-  //      if (((x/2)+offset) % 2 == 0) {
-  //        leds.setPixel(i,0x040000);
-  //      } else {
-  //        leds.setPixel(i,0x000004);
-  //      }
-  //    }
-  //  }
-
-  // offset++;
+  offset++;
   leds.show();
   delay(100);
 }
