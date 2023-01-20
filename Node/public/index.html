@@ -1,0 +1,30 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="output.css" rel="stylesheet">
+
+<div class="bg-cyan-900 h-full w-full grid place-items-center">
+    <div class="bg-cyan-600 p-4 w-80 rounded">
+        <div>
+            <textarea id="text" class="border border-cyan-400 mb-2 text-xl p-2 w-full rounded">HIGH ORDER</textarea>
+        </div>
+        <button id="sendButton" class="bg-red-600 active:bg-red-400 text-white px-2 py-1 text-xl rounded">SEND</button>
+    </div>
+</div>
+
+
+<script>
+    let textarea = document.getElementById("text");
+
+    document.getElementById("sendButton").onclick = async () => {
+        const data = {
+            "text": textarea.value
+        };
+
+        await fetch("/", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+    }
+</script>
