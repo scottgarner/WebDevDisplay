@@ -8,8 +8,11 @@ I2SClocklessLedDriver driver;
 #define LEDS_PER_STRIP 512
 #define STRIPS 6
 
+#define ROWS 8
+#define COLUMNS ((LEDS_PER_STRIP * STRIPS) / ROWS)
+
 uint8_t leds[STRIPS * LEDS_PER_STRIP * 3];
-int pins[STRIPS] = {4, 16, 17, 5, 18, 19};
+int pins[STRIPS] = {13, 12, 14, 27, 26, 25};
 
 ////
 
@@ -19,26 +22,25 @@ int pins[STRIPS] = {4, 16, 17, 5, 18, 19};
 
 ////
 
-int rows = 8;
-int columns = LEDS_PER_STRIP / 8;
-
 int offset = 0;
 int lastOffset = 0;
 int offsetTime = 100;
 
 char serialBuffer[256];
-byte serialBufferIndex = 0;
+int serialBufferIndex = 0;
 
 char fontColumns[256 * 8];
-byte fontColumnIndex = 0;
+int fontColumnIndex = 0;
 
 ////
 
-void displayText(char *buffer, int length)
+void displayText(const char *buffer, int length)
 {
+    if (length <= 0)
+        return;
     fontColumnIndex = 0;
 
-    for (byte i = 0; i < length; i++)
+    for (int i = 0; i < length; i++)
     {
         // Grab letter from buffer;
         char letter = buffer[i];
@@ -58,7 +60,7 @@ void displayText(char *buffer, int length)
         const unsigned char *fontData = &font[index][0];
 
         // Sample font columns;
-        for (byte x = 0; x < CHAR_WIDTH; x++)
+        for (int x = 0; x < CHAR_WIDTH; x++)
         {
             fontColumns[fontColumnIndex] = fontData[x];
             fontColumnIndex++;
@@ -72,13 +74,25 @@ void displayText(char *buffer, int length)
     }
 }
 
-void setupDisplay()
+void displayBrightness(byte brightness)
 {
-    driver.initled(leds, pins, STRIPS, LEDS_PER_STRIP, ORDER_GRB);
-    driver.setBrightness(10);
+    driver.setBrightness(brightness);
 }
 
-void loopDisplay()
+void displaySetup()
+{
+    driver.initled(leds, pins, STRIPS, LEDS_PER_STRIP, ORDER_GRB);
+    displayBrightness(8);
+
+    for (int i = 0; i < LEDS_PER_STRIP * STRIPS; i++)
+    {
+        driver.setPixel(i, 0, 0, 0);
+    }
+
+    driver.showPixels();
+}
+
+void displayLoop()
 {
     // Serial
 
@@ -100,15 +114,15 @@ void loopDisplay()
 
     //
 
-    for (byte x = 0; x < columns; x++)
+    for (int x = 0; x < COLUMNS; x++)
     {
         int column = (x + offset) % fontColumnIndex;
         char fontColumn = fontColumns[column];
 
-        for (byte y = 0; y < CHAR_HEIGHT; y++)
+        for (int y = 0; y < CHAR_HEIGHT; y++)
         {
 
-            int pixelIndex = (x * rows) + ((x % 2 == 0) ? y : 7 - y);
+            int pixelIndex = (x * ROWS) + ((x % 2 == 0) ? y : 7 - y);
 
             if (fontColumn & (1 << y))
             {

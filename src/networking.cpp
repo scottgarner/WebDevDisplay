@@ -1,61 +1,83 @@
 #include "globals.h"
+#include "credentials.h"
 
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <SPIFFS.h>
 
-const char *ssid = "Scoreboard";
-const char *password = "12345678";
+#include <ESPAsyncWebServer.h>
 
-WebServer server(80);
+AsyncWebServer server(80);
 
-void handleRoot()
+void handlePost()
 {
-    Serial.print("HELLO: ");
-    if (server.hasArg("hello"))
-    {
-        Serial.print(server.arg("hello"));
-    }
-
-    server.send(200, "text/plain", "hello from esp32!");
-}
-
-void handleNotFound()
-{
-    String message = "File Not Found\n\n";
-    message += "URI: ";
-    message += server.uri();
-    message += "\nMethod: ";
-    message += (server.method() == HTTP_GET) ? "GET" : "POST";
-    message += "\nArguments: ";
-    message += server.args();
-    message += "\n";
-    for (uint8_t i = 0; i < server.args(); i++)
-    {
-        message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-    }
-    server.send(404, "text/plain", message);
 }
 
 void networkingSetup()
 {
     Serial.println("Configuring access point...");
 
-    // You can remove the password parameter if you want the AP to be open.
-    WiFi.softAP(ssid, password);
-    IPAddress myIP = WiFi.softAPIP();
+    WiFi.mode(WIFI_MODE_APSTA);
 
-    Serial.print("AP IP address: ");
-    Serial.println(myIP);
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    Serial.print("ESP32 IP as soft AP: ");
+    Serial.println(WiFi.softAPIP());
 
-    server.on("/", handleRoot);
+    if (!SPIFFS.begin(true))
+    {
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        return;
+    }
 
-    server.on("/inline", []()
-              { server.send(200, "text/plain", "this works as well"); });
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    server.onNotFound(handleNotFound);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.println("Connecting to WiFi..");
+    }
 
+    Serial.print("ESP32 IP on the WiFi network: ");
+    Serial.println(WiFi.localIP());
+
+    server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+
+    server.on("/", HTTP_POST,
+              [](AsyncWebServerRequest *request)
+              { 
+
+                if (request->hasParam("brightness", true))
+                  {
+                      String brightness = request->getParam("brightness", true)->value();
+                      Serial.print("Brightness: ");
+                      Serial.println(brightness);
+                      displayBrightness(atoi(brightness.c_str()));
+                  }
+
+                //
+
+                if (request->hasParam("text", true))
+                  {
+                      String text = request->getParam("text", true)->value();
+                      Serial.print("Text: ");
+                      Serial.println(text);
+                      displayText(&text[0], text.length());
+                  }
+
+                  //
+
+                  request->send(200, "text/plain", "OK"); });
+
+    server.onNotFound([](AsyncWebServerRequest *request)
+                      { if (request->method() == HTTP_OPTIONS) {
+                            request->send(200);
+                        } else {
+                            request->send(404);
+                        } });
+
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
     server.begin();
 
     Serial.println("Server started");
@@ -68,5 +90,4 @@ void networkingSetup()
 
 void networkingLoop()
 {
-    server.handleClient();
 }

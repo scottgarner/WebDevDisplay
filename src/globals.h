@@ -4,6 +4,7 @@
 extern void networkingSetup();
 extern void networkingLoop();
 
-extern void setupDisplay();
-extern void loopDisplay();
-extern void displayText(char *, int);
+extern void displaySetup();
+extern void displayLoop();
+extern void displayBrightness(byte);
+extern void displayText(const char *, int);
