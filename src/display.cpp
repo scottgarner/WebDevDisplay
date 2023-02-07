@@ -29,21 +29,47 @@ int offsetTime = 100;
 char serialBuffer[256];
 int serialBufferIndex = 0;
 
+char rawTextBuffer[256];
+int rawTextBufferLength = 0;
+
+char processedTextBuffer[256];
+int processedTextBufferLength = 0;
+
 char fontColumns[256 * 8];
 int fontColumnIndex = 0;
 
 ////
 
-void displayText(const char *buffer, int length)
+void displayProcessRawText()
 {
-    if (length <= 0)
+    // Process variables.
+    String stringBuffer = String(rawTextBuffer, rawTextBufferLength);
+    char time[9];
+    timeNow(time);
+    stringBuffer.replace("{{time}}", time);
+
+    // Write to processed buffer.
+    strcpy(processedTextBuffer, stringBuffer.c_str());
+    processedTextBufferLength = stringBuffer.length();
+
+    // Update pixel buffer.
+    displayUpdatePixelBuffer();
+
+    // Print processed text.
+    // Serial.println(processedTextBuffer);
+}
+
+void displayUpdatePixelBuffer()
+{
+    if (processedTextBufferLength <= 0)
         return;
+
     fontColumnIndex = 0;
 
-    for (int i = 0; i < length; i++)
+    for (int i = 0; i < processedTextBufferLength; i++)
     {
         // Grab letter from buffer;
-        char letter = buffer[i];
+        char letter = processedTextBuffer[i];
 
         // Change letter into font data index.
         char index = letter & 0x7F;
@@ -67,14 +93,24 @@ void displayText(const char *buffer, int length)
         }
     }
 
-    Serial.println(fontColumnIndex);
-    for (int i = 0; i < fontColumnIndex; i++)
-    {
-        Serial.println(fontColumns[i], HEX);
-    }
+    // Serial.println(fontColumnIndex);
+    // for (int i = 0; i < fontColumnIndex; i++)
+    // {
+    //     Serial.println(fontColumns[i], HEX);
+    // }
 }
 
-void displayBrightness(byte brightness)
+void displaySetRawText(const char *buffer, int length)
+{
+    // Copy to raw buffer;
+    strcpy(rawTextBuffer, buffer);
+    rawTextBufferLength = length;
+
+    // Process new text.
+    displayProcessRawText();
+}
+
+void displaySetBrightness(byte brightness)
 {
     driver.setBrightness(brightness);
 }
@@ -82,7 +118,7 @@ void displayBrightness(byte brightness)
 void displaySetup()
 {
     driver.initled(leds, pins, STRIPS, LEDS_PER_STRIP, ORDER_GRB);
-    displayBrightness(8);
+    displaySetBrightness(8);
 
     for (int i = 0; i < LEDS_PER_STRIP * STRIPS; i++)
     {
@@ -107,7 +143,7 @@ void displayLoop()
         else
         {
             byte length = serialBufferIndex - 1;
-            displayText(serialBuffer, length);
+            displaySetRawText(serialBuffer, length);
             serialBufferIndex = 0;
         }
     }
