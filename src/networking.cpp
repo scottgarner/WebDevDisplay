@@ -16,36 +16,25 @@
 
 AsyncWebServer server(80);
 
-void handlePost()
-{
-}
-
 void networkingSetup(void (*callback)())
 {
     Serial.println("Configuring access point...");
 
+    // WIFI.
     WiFi.mode(WIFI_MODE_APSTA);
 
-    WiFi.softAP(AP_SSID, AP_PASSWORD);
-    Serial.print("ESP32 IP as soft AP: ");
-    Serial.println(WiFi.softAPIP());
+    // AP Setup.
+    {
+        WiFi.softAP(AP_SSID, AP_PASSWORD);
+        Serial.print("ESP32 IP as soft AP: ");
+        Serial.println(WiFi.softAPIP());
+    }
 
     if (!SPIFFS.begin(true))
     {
         Serial.println("An Error has occurred while mounting SPIFFS");
         return;
     }
-
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.println("Connecting to WiFi..");
-    }
-
-    Serial.print("ESP32 IP on the WiFi network: ");
-    Serial.println(WiFi.localIP());
 
     server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
 
@@ -63,13 +52,49 @@ void networkingSetup(void (*callback)())
 
                 //
 
-                if (request->hasParam("text", true))
+                if (request->hasParam("ssid", true) && request->hasParam("password", true))
                   {
-                      String text = request->getParam("text", true)->value();
-                      Serial.print("Text: ");
-                      Serial.println(text);
+                      String ssid = request->getParam("ssid", true)->value();
+                      String password = request->getParam("password", true)->value();
 
-                      displaySetRawText(&text[0], text.length());
+                      preferences.begin("networking");
+                      preferences.putString("ssid", ssid);
+                      preferences.putString("password", password);
+                      preferences.end();
+
+                      Serial.print("ssid: ");
+                      Serial.println(ssid);
+                      Serial.print("password: ");
+                      Serial.println(password.substring(0, 4));
+
+                      Serial.println("Restarting!");
+                      delay(500);
+                      ESP.restart();
+                  }
+
+                if (request->hasParam("message", true))
+                  {
+                      String message = request->getParam("message", true)->value();
+                      int index = request->getParam("index", true)->value().toInt();
+                      int speed = request->getParam("speed", true)->value().toInt();
+                      int duration = request->getParam("duration", true)->value().toInt();
+
+                      Serial.print("index: ");
+                      Serial.println(index);
+
+                      Serial.print("message: ");
+                      Serial.println(message);
+
+                      Serial.print("speed: ");
+                      Serial.println(speed);
+
+                      Serial.print("speed: ");
+                      Serial.println(duration);
+
+                      displaySetMessage(index, message.c_str(), message.length(), speed, duration);
+
+                      //  displaySetRawText(&text[0], text.length());
+                      // TODO(SJG): Set message params.
                   }
 
                   //
@@ -125,9 +150,42 @@ void networkingSetup(void (*callback)())
 
     ArduinoOTA.begin();
 
-    // Fire callback.
+    // Station setup.
+    {
+        preferences.begin("networking", true);
 
-    callback();
+        if (preferences.isKey("ssid") && preferences.isKey("password"))
+        {
+            String ssid = preferences.getString("ssid");
+            String password = preferences.getString("password");
+
+            Serial.print("ssid: ");
+            Serial.println(ssid);
+            Serial.print("password: ");
+            Serial.println(password.substring(0, 4));
+
+            WiFi.begin(ssid.c_str(), password.c_str());
+            WiFi.setAutoReconnect(true);
+
+            while (WiFi.status() != WL_CONNECTED)
+            {
+                delay(500);
+                Serial.println("Connecting to WiFi..");
+            }
+
+            Serial.print("ESP32 IP on the WiFi network: ");
+            Serial.println(WiFi.localIP());
+
+            // Fire callback.
+            callback();
+        }
+        else
+        {
+            Serial.println("No WIFI credentials set!");
+        }
+
+        preferences.end();
+    }
 }
 
 void networkingLoop()

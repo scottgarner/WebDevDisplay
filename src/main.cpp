@@ -1,8 +1,6 @@
 #include "globals.h"
 
-#include <Ticker.h>
-
-Ticker ticker;
+Preferences preferences;
 
 void setup()
 {
@@ -12,11 +10,6 @@ void setup()
   displaySetup();
   networkingSetup([]()
                   { timeSetup(); });
-
-  displaySetRawText("HIGH ORDER", 8);
-
-  ticker.attach(1, []()
-                { displayProcessRawText(); });
 }
 
 void loop()
