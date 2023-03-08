@@ -3,53 +3,33 @@
 <head>
     <title>Scoreboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-size: 16pt;
-        }
-
-        #main {
-            background: #375c7c;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #panel {
-            background: white;
-            border-radius: .25em;
-            padding: .5em;
-        }
-
-        textarea {
-            border-radius: .25em;
-            padding: .5em;
-            font-size: 1.25em;
-        }
-
-        button {
-            border-radius: .25em;
-            border: none;
-            padding: .5em 1em;
-            margin-top: .5em;
-            cursor: pointer;
-            background: orange;
-        }
-
-        button:active {
-            background: rgb(253, 195, 88);
-        }
-    </style>
+    <link rel="stylesheet" href="../index.css">
 </head>
 
 <body>
     <div id="main">
         <div id="panel">
-            <div><textarea id="text" maxlength="256"></textarea></div>
+            <div>
+                <label>INDEX</label>
+                <select id="index">
+                    <option value="0">A</option>
+                    <option value="1">B</option>
+                    <option value="2">C</option>
+                    <option value="3">D</option>
+                </select>
+            </div>
+            <div>
+                <label>MESSAGE</label>
+                <textarea id="message" maxlength="256">HIGH ORDER</textarea>
+            </div>
+            <div>
+                <label>SPEED</label>
+                <input type="number" id="speed" value="8" min="0" max="64" />
+            </div>
+            <div>
+                <label>DURATION</label>
+                <input type="number" id="duration" value="8" min="0" max="256" />
+            </div>
             <button id="send">SEND</button>
         </div>
     </div>
@@ -57,12 +37,21 @@
     <script>
         document.getElementById("send").onclick = async () => {
 
-            let text = document.getElementById("text").value;
+            let index = document.getElementById("index").value;
+            let message = document.getElementById("message").value;
+            let speed = document.getElementById("speed").value;
+            let duration = document.getElementById("duration").value;
 
             let formData = new FormData();
-            formData.append('text', text);
 
-            console.log("Sending: " + text);
+            formData.append('index', index);
+            formData.append('message', message);
+            formData.append('speed', speed);
+            formData.append('duration', duration);
+
+            console.log(index, message, speed, duration);
+
+            console.log("Sending: " + message);
             await fetch("http://scoreboard.local/", {
                 method: "POST",
                 body: formData
