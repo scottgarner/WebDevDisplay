@@ -1,6 +1,5 @@
 
 #include "globals.h"
-#include "credentials.h"
 #include "time.h"
 
 const char *ntpServer = "pool.ntp.org";

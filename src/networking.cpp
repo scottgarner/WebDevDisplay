@@ -1,5 +1,4 @@
 #include "globals.h"
-#include "credentials.h"
 
 #include <ArduinoOTA.h>
 #include <ESPmDNS.h>
@@ -16,19 +15,29 @@
 
 AsyncWebServer server(80);
 
+bool initialized = false;
+void (*onInitalized)();
+
 void networkingSetup(void (*callback)())
 {
     Serial.println("Configuring access point...");
 
     // WIFI.
-    WiFi.mode(WIFI_MODE_APSTA);
+    // WiFi.mode(WIFI_MODE_APSTA);
+    WiFi.mode(WIFI_MODE_STA);
 
     // AP Setup.
+    /*
     {
-        WiFi.softAP(AP_SSID, AP_PASSWORD);
+        WiFi.softAP(configuration.ap_ssid, configuration.ap_password);
+
+        Serial.print("Connecting to: ");
+        Serial.println(configuration.ap_ssid);
+
         Serial.print("ESP32 IP as soft AP: ");
         Serial.println(WiFi.softAPIP());
     }
+    */
 
     if (!SPIFFS.begin(true))
     {
@@ -38,68 +47,25 @@ void networkingSetup(void (*callback)())
 
     server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
 
-    server.on("/", HTTP_POST,
+    server.on("/data", HTTP_GET,
               [](AsyncWebServerRequest *request)
-              { 
+              {
+                  AsyncResponseStream *response = request->beginResponseStream("application/json");
+                  serializeJson(dataGetJson(), *response);
+                  request->send(response);
+              });
 
-                if (request->hasParam("brightness", true))
-                  {
-                      String brightness = request->getParam("brightness", true)->value();
-                      Serial.print("Brightness: ");
-                      Serial.println(brightness);
-                      displaySetBrightness(atoi(brightness.c_str()));
-                  }
-
-                //
-
-                if (request->hasParam("ssid", true) && request->hasParam("password", true))
-                  {
-                      String ssid = request->getParam("ssid", true)->value();
-                      String password = request->getParam("password", true)->value();
-
-                      preferences.begin("networking");
-                      preferences.putString("ssid", ssid);
-                      preferences.putString("password", password);
-                      preferences.end();
-
-                      Serial.print("ssid: ");
-                      Serial.println(ssid);
-                      Serial.print("password: ");
-                      Serial.println(password.substring(0, 4));
-
-                      Serial.println("Restarting!");
-                      delay(500);
-                      ESP.restart();
-                  }
-
-                if (request->hasParam("message", true))
-                  {
-                      String message = request->getParam("message", true)->value();
-                      int index = request->getParam("index", true)->value().toInt();
-                      int speed = request->getParam("speed", true)->value().toInt();
-                      int duration = request->getParam("duration", true)->value().toInt();
-
-                      Serial.print("index: ");
-                      Serial.println(index);
-
-                      Serial.print("message: ");
-                      Serial.println(message);
-
-                      Serial.print("speed: ");
-                      Serial.println(speed);
-
-                      Serial.print("speed: ");
-                      Serial.println(duration);
-
-                      displaySetMessage(index, message.c_str(), message.length(), speed, duration);
-
-                      //  displaySetRawText(&text[0], text.length());
-                      // TODO(SJG): Set message params.
-                  }
-
-                  //
-
-                  request->send(200, "text/plain", "OK"); });
+    server.on(
+        "/data", HTTP_POST,
+        [](AsyncWebServerRequest *request) {},
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            Serial.println("Handling post request...");
+            dataParseJson(data);
+            Serial.println("Sending response...");
+            request->send(200, "text/plain", "OK");
+        });
 
     server.onNotFound([](AsyncWebServerRequest *request)
                       { if (request->method() == HTTP_OPTIONS) {
@@ -152,43 +118,30 @@ void networkingSetup(void (*callback)())
 
     // Station setup.
     {
-        preferences.begin("networking", true);
+        Serial.print("Connecting to SSID: ");
+        Serial.println(configuration.wifi_ssid);
 
-        if (preferences.isKey("ssid") && preferences.isKey("password"))
-        {
-            String ssid = preferences.getString("ssid");
-            String password = preferences.getString("password");
-
-            Serial.print("ssid: ");
-            Serial.println(ssid);
-            Serial.print("password: ");
-            Serial.println(password.substring(0, 4));
-
-            WiFi.begin(ssid.c_str(), password.c_str());
-            WiFi.setAutoReconnect(true);
-
-            while (WiFi.status() != WL_CONNECTED)
-            {
-                delay(500);
-                Serial.println("Connecting to WiFi..");
-            }
-
-            Serial.print("ESP32 IP on the WiFi network: ");
-            Serial.println(WiFi.localIP());
-
-            // Fire callback.
-            callback();
-        }
-        else
-        {
-            Serial.println("No WIFI credentials set!");
-        }
-
-        preferences.end();
+        WiFi.begin(configuration.wifi_ssid, configuration.wifi_password);
+        WiFi.setAutoReconnect(true);
     }
+
+    onInitalized = callback;
 }
 
 void networkingLoop()
 {
+    if (!initialized && WiFi.status() == WL_CONNECTED)
+    {
+        Serial.print("ESP32 IP on the WiFi network: ");
+        Serial.println(WiFi.localIP());
+
+        onInitalized();
+        initialized = true;
+    }
+    else if (!initialized)
+    {
+        Serial.print(WiFi.status());
+    }
+
     ArduinoOTA.handle();
 }
