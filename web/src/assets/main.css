@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 body {
-    @apply bg-gray-800;
+    @apply bg-zinc-800;
 }
 
 button {
-    @apply rounded text-xs uppercase;
+    @apply uppercase;
 }
 
 label {
-    @apply block text-gray-700 text-xs mt-1;
+    @apply block text-gray-700 text-xs my-2 uppercase;
 }

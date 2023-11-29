@@ -1,3 +1,4 @@
+#include <mutex>
 #include "globals.h"
 
 #define NAMESPACE "data"
@@ -8,8 +9,12 @@ Configuration configuration;
 Message messages[4];
 uint messageCount;
 
+std::mutex dataMutex;
+
 void dataLoad()
 {
+    std::lock_guard<std::mutex> lock(dataMutex);
+
     preferences.begin(NAMESPACE);
 
     size_t bufferLength = preferences.getBytesLength("messages");
@@ -50,41 +55,39 @@ void dataParseJson(uint8_t *data)
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, data);
 
-    // SSID
-    const char *ssid = doc["ssid"];
-    if (ssid)
-    {
-        Serial.println(ssid);
-    }
-
     // Messages
     if (doc.containsKey("messages"))
     {
-        JsonArray messagesArray = doc["messages"];
-        messageCount = messagesArray.size();
-        if (messageCount > 4)
-            messageCount = 4;
-
-        for (int i = 0; i < messageCount; i++)
+        // Lock resources while updating.
         {
-            String text = messagesArray[i]["text"];
+            std::lock_guard<std::mutex> lock(dataMutex);
 
-            uint speed = messagesArray[i]["speed"];
-            uint duration = messagesArray[i]["duration"];
+            JsonArray messagesArray = doc["messages"];
+            messageCount = messagesArray.size();
+            if (messageCount > 4)
+                messageCount = 4;
 
-            uint red = messagesArray[i]["red"];
-            uint green = messagesArray[i]["green"];
-            uint blue = messagesArray[i]["blue"];
+            for (int i = 0; i < messageCount; i++)
+            {
+                String text = messagesArray[i]["text"];
 
-            messages[i].text_bufer_length = text.length();
-            strcpy(messages[i].text_buffer, text.c_str());
+                uint speed = messagesArray[i]["speed"];
+                uint duration = messagesArray[i]["duration"];
 
-            messages[i].speed = speed;
-            messages[i].duration = duration;
+                uint red = messagesArray[i]["red"];
+                uint green = messagesArray[i]["green"];
+                uint blue = messagesArray[i]["blue"];
 
-            messages[i].red = red;
-            messages[i].green = green;
-            messages[i].blue = blue;
+                messages[i].text_buffer_length = text.length();
+                strcpy(messages[i].text_buffer, text.c_str());
+
+                messages[i].speed = speed;
+                messages[i].duration = duration;
+
+                messages[i].red = red;
+                messages[i].green = green;
+                messages[i].blue = blue;
+            }
         }
 
         dataSave();

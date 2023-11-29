@@ -50,7 +50,7 @@ void displayRefresh()
 {
 
     char *rawTextBuffer = messages[messageIndex].text_buffer;
-    uint8_t rawTextBufferLength = messages[messageIndex].text_bufer_length;
+    uint8_t rawTextBufferLength = messages[messageIndex].text_buffer_length;
 
     // Process variables.
     String stringBuffer = String(rawTextBuffer, rawTextBufferLength);
@@ -61,24 +61,18 @@ void displayRefresh()
     Serial.print("Displaying message: ");
     Serial.println(stringBuffer);
 
-    // Write to processed buffer.
-    char processedTextBuffer[256];
-    int processedTextBufferLength = 0;
-
-    strcpy(processedTextBuffer, stringBuffer.c_str());
-    processedTextBufferLength = stringBuffer.length();
-
+    Serial.println("Updating pixel buffer...");
     // Update pixel buffer.
     {
-        if (processedTextBufferLength <= 0)
+        if (stringBuffer.length() <= 0)
             return;
 
         fontColumnIndex = 0;
 
-        for (int i = 0; i < processedTextBufferLength; i++)
+        for (int i = 0; i < stringBuffer.length(); i++)
         {
             // Grab letter from buffer;
-            char letter = processedTextBuffer[i];
+            char letter = stringBuffer[i];
 
             // Change letter into font data index.
             char index = letter & 0x7F;
@@ -116,7 +110,7 @@ void displaySetup()
 
     for (int i = 0; i < NUM_LEDS_PER_STRIP * STRIPS; i++)
     {
-        float a = (i % 16 == 0) ? 255 : 0;
+        float a = (i % 2 == 0) ? 128 : 0;
         driver.setPixel(i, a, a, a);
     }
 
@@ -128,6 +122,7 @@ void displaySetup()
 
 void displayLoop()
 {
+    bool redraw = false;
 
     // Handle scrolling.
     if (messages[messageIndex].speed > 0)
@@ -136,6 +131,7 @@ void displayLoop()
         {
             offset++;
             lastOffsetTime = millis();
+            redraw = true;
         }
     }
 
@@ -143,9 +139,10 @@ void displayLoop()
     if (messageCount > 0 && millis() - lastMessageCycleTime > (messages[messageIndex].duration * 1000.0))
     {
         messageIndex = (messageIndex + 1) % messageCount;
-        offset = 0;
+        // offset = 0;
         displayRefresh();
         lastMessageCycleTime = millis();
+        redraw = true;
     }
 
     // Handle refresh interval.
@@ -153,33 +150,38 @@ void displayLoop()
     {
         displayRefresh();
         lastRefreshTime = millis();
+        redraw = true;
     }
 
     // Set pixels.
-    for (int x = 0; x < COLUMNS; x++)
+    if (redraw)
     {
-        int column = (x + offset) % fontColumnIndex;
-        char fontColumn = fontColumns[column];
 
-        for (int y = 0; y < CHAR_HEIGHT; y++)
+        for (int x = 0; x < COLUMNS; x++)
         {
-            int pixelIndex = (x * ROWS) + ((x % 2 == 0) ? y : 7 - y);
+            int column = (x + offset) % fontColumnIndex;
+            char fontColumn = fontColumns[column];
 
-            if (fontColumn & (1 << y))
+            for (int y = 0; y < CHAR_HEIGHT; y++)
             {
-                uint red = messages[messageIndex].red;
-                uint green = messages[messageIndex].green;
-                uint blue = messages[messageIndex].blue;
+                int pixelIndex = (x * ROWS) + ((x % 2 == 0) ? y : 7 - y);
 
-                driver.setPixel(pixelIndex, red, green, blue);
-            }
-            else
-            {
-                driver.setPixel(pixelIndex, 0, 0, 0);
+                if (fontColumn & (1 << y))
+                {
+                    uint red = messages[messageIndex].red;
+                    uint green = messages[messageIndex].green;
+                    uint blue = messages[messageIndex].blue;
+
+                    driver.setPixel(pixelIndex, red, green, blue);
+                }
+                else
+                {
+                    driver.setPixel(pixelIndex, 0, 0, 0);
+                }
             }
         }
-    }
 
-    // Show pixels.
-    driver.showPixels();
+        // Show pixels.
+        driver.showPixels();
+    }
 }

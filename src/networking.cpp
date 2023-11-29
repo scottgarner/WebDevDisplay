@@ -22,6 +22,9 @@ void networkingSetup(void (*callback)())
 {
     Serial.println("Configuring access point...");
 
+    Serial.print("Core: ");
+    Serial.println(CONFIG_ASYNC_TCP_RUNNING_CORE);
+
     // WIFI.
     // WiFi.mode(WIFI_MODE_APSTA);
     WiFi.mode(WIFI_MODE_STA);
@@ -140,7 +143,7 @@ void networkingLoop()
     }
     else if (!initialized)
     {
-        Serial.print(WiFi.status());
+        // Serial.print(WiFi.status());
     }
 
     ArduinoOTA.handle();

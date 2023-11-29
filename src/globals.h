@@ -29,7 +29,7 @@ extern void timeNow(char *time);
 typedef struct
 {
     char text_buffer[128] = "HIGH ORDER ";
-    uint8_t text_bufer_length = 11;
+    uint8_t text_buffer_length = 11;
     uint8_t duration = 10;
     uint8_t speed = 10;
     uint8_t red = 255;
