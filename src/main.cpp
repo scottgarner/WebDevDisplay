@@ -1,22 +1,15 @@
 #include "globals.h"
 
-#define configCHECK_FOR_STACK_OVERFLOW 2
+// #define configCHECK_FOR_STACK_OVERFLOW 2
 
-void displayTask(void *parameter)
-{
-  while (1)
-  {
-    displayLoop();
-  }
-}
-
-void networkingTask(void *parameter)
-{
-  while (1)
-  {
-    networkingLoop();
-  }
-}
+// void networkingTask(void *parameter)
+// {
+//   while (1)
+//   {
+//     networkingLoop();
+//     taskYIELD();
+//   }
+// }
 
 void setup()
 {
@@ -28,25 +21,18 @@ void setup()
   networkingSetup([]()
                   { timeSetup(); });
 
-  xTaskCreate(
-      displayTask,   /* Task function. */
-      "displayTask", /* String with name of task. */
-      1024 * 8,      /* Stack size in bytes. */
-      NULL,          /* Parameter passed as input of the task */
-      1,             /* Priority of the task. */
-      NULL);         /* Task handle. */
-
-  xTaskCreate(
-      networkingTask,   /* Task function. */
-      "networkingTask", /* String with name of task. */
-      1024 * 8,         /* Stack size in bytes. */
-      NULL,             /* Parameter passed as input of the task */
-      1,                /* Priority of the task. */
-      NULL);            /* Task handle. */
+  // xTaskCreatePinnedToCore(
+  //     networkingTask,   /* Task function. */
+  //     "networkingTask", /* String with name of task. */
+  //     1024 * 8,         /* Stack size in bytes. */
+  //     NULL,             /* Parameter passed as input of the task */
+  //     4,                /* Priority of the task. */
+  //     NULL,             /* Task handle. */
+  //     0);               /* CPU core. */
 }
 
 void loop()
 {
-  // displayLoop();
-  // networkingLoop();
+  displayLoop();
+  networkingLoop();
 }

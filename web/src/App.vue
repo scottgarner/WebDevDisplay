@@ -5,7 +5,7 @@
 
       <form class="container m-auto p-2">
 
-        <h1 class="text-white text-2xl uppercase mb-2 tracking-wider">
+        <h1 class="text-white text-2xl uppercase mb-2 tracking-wider text-center">
           <Icon icon="mdi:trophy" class="inline align-[-.125em] mr-1" />Scoreboard
         </h1>
 
@@ -29,7 +29,7 @@
                   speed
                 </label>
                 <input class="appearance-none border w-full py-2 px-3 text-gray-700 leading-tight text-sm " id="speed"
-                  type="text" v-model="message.speed">
+                  type="number" pattern="\d*" v-model="message.speed">
               </div>
 
               <div>
@@ -37,7 +37,7 @@
                   duration
                 </label>
                 <input class="appearance-none border w-full py-2 px-3 text-gray-700 leading-tight " id="duration"
-                  type="text" v-model="message.duration">
+                  type="number" pattern="\d*" v-model="message.duration">
               </div>
             </div>
 

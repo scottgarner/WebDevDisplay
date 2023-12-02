@@ -99,6 +99,8 @@ DynamicJsonDocument dataGetJson()
 
     DynamicJsonDocument doc(1024);
 
+    doc["version"] = "1.0";
+
     // Messages
     for (int i = 0; i < messageCount; i++)
     {

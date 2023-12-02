@@ -48,8 +48,6 @@ void networkingSetup(void (*callback)())
         return;
     }
 
-    server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
-
     server.on("/data", HTTP_GET,
               [](AsyncWebServerRequest *request)
               {
@@ -69,6 +67,10 @@ void networkingSetup(void (*callback)())
             Serial.println("Sending response...");
             request->send(200, "text/plain", "OK");
         });
+
+    server.serveStatic("/assets/index.js", SPIFFS, "/assets/index.js").setCacheControl("max-age=31536000");
+    server.serveStatic("/assets/index.css", SPIFFS, "/assets/index.css").setCacheControl("max-age=31536000");
+    server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html").setCacheControl("max-age=31536000");
 
     server.onNotFound([](AsyncWebServerRequest *request)
                       { if (request->method() == HTTP_OPTIONS) {
@@ -126,6 +128,7 @@ void networkingSetup(void (*callback)())
 
         WiFi.begin(configuration.wifi_ssid, configuration.wifi_password);
         WiFi.setAutoReconnect(true);
+        WiFi.setSleep(false);
     }
 
     onInitalized = callback;
