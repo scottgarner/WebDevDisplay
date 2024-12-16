@@ -1,38 +1,71 @@
 #include "globals.h"
 
 #include <ArduinoOTA.h>
-#include <ArduinoJson.h>
-
 #include <WiFiManager.h>
 #include <ESPAsyncWebServer.h>
-
-WiFiManager wm;
+#include <ESPmDNS.h>
 
 AsyncWebServer server(HTTP_PORT);
 AsyncWebSocket ws("/ws");
 
-uint8_t buffer[16385];
+uint8_t buffer[GRAPHICS_BUFFER_MAX];
 int bufferSize = 0;
 
-void processBuffer(uint8_t *buffer, size_t bufferSize)
+WiFiManager wm;
+
+void appendBuffer(uint8_t *data, size_t len, size_t index)
 {
-    displaySetBuffer(buffer, bufferSize, true);
+    if (index == 0)
+    {
+        bufferSize = 0;
+    }
+
+    if (bufferSize + len > GRAPHICS_BUFFER_MAX)
+    {
+        Serial.println("Buffer overflow detected!");
+        return;
+    }
+
+    for (size_t i = 0; i < len; i++)
+    {
+        buffer[bufferSize] = data[i];
+        bufferSize++;
+    }
 }
 
 void networkingSetup()
 {
-    // wm.resetSettings();
-    wm.setConfigPortalBlocking(false);
-    wm.setWiFiAutoReconnect(true);
-    wm.setHostname(HOSTNAME);
+    // Wifi
+    {
+        // wm.resetSettings();
+        wm.setClass("invert");
+        wm.setWiFiAutoReconnect(true);
 
-    if (wm.autoConnect(HOSTNAME))
-    {
-        Serial.println("Connected!");
+        bool result = wm.autoConnect(HOSTNAME);
+
+        if (!result)
+        {
+            Serial.println("Failed to connect!");
+            // ESP.restart();
+        }
+        else
+        {
+            Serial.println("Connected!");
+        }
     }
-    else
+
+    // MDNS
     {
-        Serial.println("No connection. Running config porta.");
+        if (!MDNS.begin(HOSTNAME))
+        {
+            Serial.println("Error setting up MDNS responder!");
+        }
+        else
+        {
+            Serial.println("MDNS enabled.");
+            MDNS.enableArduino(OTA_PORT, false);
+            MDNS.addService("http", "tcp", HTTP_PORT);
+        }
     }
 
     // Default headers.
@@ -48,23 +81,17 @@ void networkingSetup()
             "/status", HTTP_GET,
             [](AsyncWebServerRequest *request)
             {
-                StaticJsonDocument<200> jsonDoc;
-
-                jsonDoc["SSID"] = WiFi.SSID();
-                jsonDoc["IP"] = WiFi.localIP().toString();
-                jsonDoc["RSSI"] = WiFi.RSSI();
-
-                String jsonString;
-                serializeJson(jsonDoc, jsonString);
+                String jsonString = String() +
+                                    "{" +
+                                    "\"ssid\":\"" + WiFi.SSID() + "\"," +
+                                    "\"ip\":\"" + WiFi.localIP().toString() + "\"," +
+                                    "\"rsi\":" + WiFi.RSSI() + "," +
+                                    "\"rows\":" + ROWS + "," +
+                                    "\"columns\":" + COLUMNS + "," +
+                                    "\"freeMemory\":" + ESP.getFreeHeap() +
+                                    "}";
 
                 request->send(200, "application/json", jsonString);
-            });
-
-        server.on(
-            "/buffer", HTTP_GET,
-            [](AsyncWebServerRequest *request)
-            {
-                request->send(200, "text/plain", "OK");
             });
 
         server.on(
@@ -73,36 +100,33 @@ void networkingSetup()
             NULL,
             [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
             {
-                if (index == 0)
-                {
-                    Serial.printf("BodyStart: %u\n", total);
-                    bufferSize = 0;
-                }
-
                 Serial.printf("Length: %u/%u \n", len, total);
-                for (size_t i = 0; i < len; i++)
-                {
-                    buffer[bufferSize] = data[i];
-                    bufferSize++;
-                }
+                appendBuffer(data, len, index);
 
                 if (index + len == total)
                 {
-                    Serial.printf("BodyEnd: %u %u\n", total, bufferSize);
-                    processBuffer(buffer, bufferSize);
+                    displaySetBuffer(buffer, bufferSize);
                     request->send(200, "text/plain", "OK");
                 }
             });
 
-        server.onNotFound([](AsyncWebServerRequest *request)
-                          { 
-                        if (request->method() == HTTP_OPTIONS) {
-                            Serial.println("Options!");
-                            request->send(200, "text/plain", "OK");
-                        } else {
-                            Serial.println("404?");
-                            request->send(200, "text/plain", "OK?");
-                        } });
+        server.onNotFound(
+            [](AsyncWebServerRequest *request)
+            {
+                Serial.println("URI: " + request->url());
+                Serial.println("Method: " + request->method());
+
+                if (request->method() == HTTP_OPTIONS)
+                {
+                    Serial.println("Options!");
+                    request->send(200, "text/plain", "OK");
+                }
+                else
+                {
+                    Serial.println("404?");
+                    request->send(200, "text/plain", "OK?");
+                }
+            });
     }
 
     // Websocket handler.
@@ -112,34 +136,20 @@ void networkingSetup()
             {
                 if (type == WS_EVT_CONNECT)
                 {
-                    Serial.println("Client connected");
-                    client->text("Hello Client!");
+                    Serial.println("Client connected.");
                 }
                 else if (type == WS_EVT_DISCONNECT)
                 {
-                    Serial.println("Client disconnected");
+                    Serial.println("Client disconnected.");
                 }
                 else if (type == WS_EVT_DATA)
                 {
                     AwsFrameInfo *info = (AwsFrameInfo *)arg;
 
-                    if (info->index == 0)
-                    {
-                        bufferSize = 0;
-                    }
-
-                    for (size_t i = 0; i < len; i++)
-                    {
-                        buffer[bufferSize] = data[i];
-                        bufferSize++;
-                    }
+                    appendBuffer(data, len, info->index);
 
                     if (info->final)
-                    {
-                        // Serial.println("Last frame received");
-                        // Serial.printf("Received full data: %u bytes\n", bufferSize);
-                        processBuffer(buffer, bufferSize);
-                    }
+                        displaySetBuffer(buffer, bufferSize);
                 }
             });
         server.addHandler(&ws);
@@ -148,24 +158,18 @@ void networkingSetup()
     // Static files.
     {
 
-        if (!LittleFS.begin(true))
-        {
-            Serial.println("An Error has occurred while mounting LittleFS!");
-        }
-
-        server.serveStatic("/assets/index.js", LittleFS, "/assets/index.js").setCacheControl("max-age=31536000");
-        server.serveStatic("/assets/index.css", LittleFS, "/assets/index.css").setCacheControl("max-age=31536000");
         server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html").setCacheControl("max-age=31536000");
     }
 
     // Server begin.
+    Serial.println("Starting server...");
     server.begin();
 
     // OTA updates.
     {
         ArduinoOTA.setHostname(HOSTNAME);
         ArduinoOTA.setPort(OTA_PORT);
-        ArduinoOTA.setMdnsEnabled(true);
+        ArduinoOTA.setMdnsEnabled(false);
 
         ArduinoOTA
             .onStart([]()
@@ -189,7 +193,6 @@ void networkingSetup()
 
 void networkingLoop()
 {
-    wm.process();
     ws.cleanupClients();
     ArduinoOTA.handle();
 }
