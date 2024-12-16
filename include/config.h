@@ -1,13 +1,9 @@
-#define HOSTNAME "scoreboard"
-#define BRIGHTNESS 4
+#define HOSTNAME "webdev"
+#define BRIGHTNESS 128
 
-#define HTTP_PORT 80
-#define OTA_PORT 3232
+#define ROWS 10
+#define COLUMNS 288
 
-#define COLUMNS 8
-#define ROWS 8
+#define LEDS_PER_STRIP 720
 
-#define NUM_LEDS_PER_STRIP 64
-#define DATA_PIN D10
-
-#define GRAPHICS_BUFFER_MAX 1 << 15
+#include "lut_10x288.h"
