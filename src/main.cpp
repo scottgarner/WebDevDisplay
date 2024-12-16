@@ -4,12 +4,17 @@ void setup()
 {
   Serial.begin(115200);
 
-  displaySetup();
+  if (!LittleFS.begin(true))
+  {
+    Serial.println("An Error has occurred while mounting LittleFS!");
+  }
+
   networkingSetup();
+  displaySetup();
 }
 
 void loop()
 {
-  displayLoop();
   networkingLoop();
+  displayLoop();
 }
