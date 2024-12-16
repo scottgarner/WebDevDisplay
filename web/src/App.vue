@@ -1,163 +1,259 @@
 <template>
-  <div class="min-h-screen h-full flex items-center justify-center">
+  <div class="w-full min-h-screen h-full flex items-center justify-center m-0">
+    <div class="m-auto p-2 w-full md:w-9/12">
+      <h1 class="text-white text-2xl uppercase mb-2 tracking-wider text-center">
+        <Icon icon="mdi:trophy" class="inline align-[-.125em] mr-1" />Scoreboard
+      </h1>
 
-    <div v-if="jsonData" class="w-full m-2">
-
-      <form class="container m-auto p-2">
-
-        <h1 class="text-white text-2xl uppercase mb-2 tracking-wider text-center">
-          <Icon icon="mdi:trophy" class="inline align-[-.125em] mr-1" />Scoreboard
-        </h1>
-
-
-        <div v-for="(message, index) in jsonData.messages" :key="index" class="bg-zinc-100 mb-4 relative">
-          <header class="flex items-center justify-center uppercase h-8 text-white bg-zinc-600">
-            Message {{ index }}
-          </header>
-
-          <div class="p-2 font-mono">
-
-            <label for="text">
-              text({{ message.text.length }})
-            </label>
-            <input class="appearance-none border w-full py-2 px-3 text-gray-600 leading-tight text-sm " id="text"
-              type="text" v-model="message.text" maxlength="128">
-
-            <div class="grid grid-cols-2 gap-2 my-2">
-              <div>
-                <label for="speed">
-                  speed
-                </label>
-                <input class="appearance-none border w-full py-2 px-3 text-gray-700 leading-tight text-sm " id="speed"
-                  type="number" pattern="\d*" v-model="message.speed">
-              </div>
-
-              <div>
-                <label for="duration">
-                  duration
-                </label>
-                <input class="appearance-none border w-full py-2 px-3 text-gray-700 leading-tight " id="duration"
-                  type="number" pattern="\d*" v-model="message.duration">
-              </div>
-            </div>
-
-            <label for="color">
-              color
-            </label>
-            <div class="grid grid-cols-4 gap-2 border-gray-200 bg-white border p-2 text-sm" id="color">
-
-              <div class="col-span-3 m-0 p-0 h-full">
-                <input type="range" id="red" v-model="message.red" min="0" max="255"
-                  class="w-full appearance-none bg-red-400 p-0 m-0 h-4 rounded-full" />
-                <input type="range" id="green" v-model="message.green" min="0" max="255"
-                  class="w-full appearance-none bg-green-400 p-0 m-0 h-4 rounded-full" />
-                <input type="range" id="blue" v-model="message.blue" min="0" max="255"
-                  class="w-full appearance-none bg-blue-400 p-0 m-0 h-4 rounded-full " />
-              </div>
-
-              <div class="border border-gray w-full h-full" :style="{ backgroundColor: rgbColor(index) }"></div>
-            </div>
-
-            <button v-if="index == 0 && jsonData.messages.length < 4"
-              class="absolute top-0 right-0 bg-green-500 active:bg-green-700 text-white w-8 h-8 text-xl flex items-center justify-center"
-              type="button" @click="addMessage()">
-              <Icon icon="mdi:plus" />
-            </button>
-
-            <button v-if="index > 0"
-              class="absolute top-0 right-0 bg-red-500 active:bg-red-700 text-white w-8 h-8 text-xl flex items-center justify-center"
-              type="button" @click="removeMessage(index)">
-              <Icon icon="mdi:minus" />
-            </button>
+      <div class="border-white border rounded-md p-2 mb-2">
+        <label for="inputText">Text Input</label>
+        <div class="flex items-center space-x-2 mb-2">
+          <div class="flex-1">
+            <input
+              type="text"
+              ref="inputText"
+              placeholder="Enter text here..."
+              class="w-full p-2 h-12 border rounded-md"
+              v-model="settings.text"
+            />
+          </div>
+          <input
+            type="color"
+            ref="foreground"
+            class="w-12 h-12 border rounded appearance-none"
+            v-model="settings.foreground"
+          />
+          <input
+            type="color"
+            ref="background"
+            class="w-12 h-12 border rounded"
+            v-model="settings.background"
+          />
+        </div>
+        <button id="generate" @click="generate">Generate Canvas</button>
+        <hr class="my-4 border-zinc-600" />
+        <label>Canvas Buffer</label>
+        <div class="overflow-x-scroll mb-4 border bg-zinc-700">
+          <canvas ref="bufferCanvas" class="hidden"></canvas>
+          <canvas
+            ref="renderCanvas"
+            class="h-16"
+            @drop.prevent="handleDrop"
+            @dragenter.prevent
+            @dragover.prevent
+          ></canvas>
+        </div>
+        <div>
+          <label>Scroll Speed ({{ settings.scrollSpeed }})</label>
+          <div>
+            <input
+              type="range"
+              min="0"
+              max="32"
+              v-model="settings.scrollSpeed"
+              class="w-full bg-zinc-400 rounded-lg appearance-none mb-4"
+            />
           </div>
         </div>
+        <button id="publish" @click="publish">Publish Canvas</button>
 
-
-        <button v-if="!statusMessage" class="bg-orange-500 active:bg-orange-700 text-white text-sm w-full py-2 px-4 "
-          type="button" @click="submit">
-          <span>
-            <Icon icon="mdi:upload" class="inline align-[-2px]" />Submit
-          </span>
-        </button>
-
-        <div v-if="statusMessage" class="bg-orange-500 text-white py-2 px-4 text-center text-sm">
-          <Icon icon="mdi:info" class="inline align-[-2px]" /> {{ statusMessage }}
-        </div>
-
-
-      </form>
+        <hr class="my-4 border-zinc-600" />
+        <label>Status: {{ status }}</label>
+      </div>
     </div>
-
-
-    <div v-if="!jsonData" class="text-white">
-      Loading...
-    </div>
-
   </div>
-
 </template>
 
+<style scoped></style>
+
 <script setup lang="ts">
+let bufferHeight: number = 10;
 
-import { ref, onMounted, computed } from 'vue';
-import { Icon } from '@iconify/vue';
+interface Settings {
+  text: string;
+  foreground: string;
+  background: string;
+  scrollSpeed: number;
+}
 
-const jsonData = ref<any>(null);
-const statusMessage = ref<string | null>(null);
+import { onMounted, ref } from "vue";
+import { Icon } from "@iconify/vue";
+import { Scoreboard } from "./lib/scoreboard";
 
-let timeout: number;
+const scoreboard = new Scoreboard();
 
+const bufferCanvas = ref<HTMLCanvasElement | null>(null);
+const renderCanvas = ref<HTMLCanvasElement | null>(null);
 
-onMounted(async () => {
-  try {
-    const response = await fetch('http://scoreboard.local/data');
-    jsonData.value = await response.json();
+const status = ref("");
 
-    console.log(jsonData.value);
-  } catch (error) {
-    console.error('Error fetching data:', error);
-  }
+let renderContext: CanvasRenderingContext2D;
+let bufferContext: CanvasRenderingContext2D;
+
+const settings = ref<Settings>({
+  text: "",
+  foreground: "#efefef",
+  background: "#000000",
+  scrollSpeed: 0,
 });
 
-const addMessage = () => {
-  jsonData.value.messages.push({ text: 'HIGH ORDER', speed: '8', duration: '8', red: 255, green: 255, blue: 255 });
-};
+onMounted(async () => {
+  // Load local data.
+  loadData();
 
-const removeMessage = (index: number) => {
-  jsonData.value.messages.splice(index, 1);
-};
-
-const rgbColor = (index: number) => {
-  var message = jsonData.value.messages[index];
-  return `rgb(${message.red}, ${message.green}, ${message.blue})`;
-};
-
-const submit = async () => {
-  try {
-    statusMessage.value = "";
-
-    const body = JSON.stringify(jsonData.value);
-    const response = await fetch('http://scoreboard.local/data', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-      body,
-    });
-
-    console.log('Data posted successfully:', response);
-    statusMessage.value = 'Data submitted successfully...';
-  } catch (error: any) {
-    console.error('Error posting data:', error);
-    statusMessage.value = `Error submitting data!`;
+  // Load remote data.
+  {
+    await fetch("http://scoreboard.local/status")
+      .then((response) => response.json())
+      .then((data) => {
+        console.log(data);
+        bufferHeight = data.rows;
+      })
+      .catch((error) => {
+        status.value = "Can't pull remote data.";
+        console.log(error);
+      });
   }
 
-  clearTimeout(timeout);
+  // Configure canvases.
+  {
+    bufferCanvas.value!.width = 1024;
+    bufferCanvas.value!.height = bufferHeight;
+    bufferContext = bufferCanvas.value!.getContext("2d")!;
 
-  timeout = setTimeout(() => {
-    statusMessage.value = "";
-  }, 1000);
+    renderCanvas.value!.width = 8;
+    renderCanvas.value!.height = bufferHeight;
+    renderContext = renderCanvas.value!.getContext("2d", {
+      willReadFrequently: true,
+    })!;
+  }
 
+  // Load font.
+  {
+    const font = new FontFace("04b20", "url(/fonts/04B_20__.woff2)");
+    await font.load();
+    document.fonts.add(font);
+    console.log([...document.fonts].map((f) => f.family));
+  }
+
+  // Generate initial canvas.
+  generate();
+
+  status.value = "Ready.";
+});
+
+const generate = () => {
+  status.value = "Generating canvas.";
+
+  const text = settings.value.text;
+  if (!text) return;
+
+  // Clear buffer.
+  bufferContext.fillStyle = settings.value.background;
+  bufferContext.fillRect(
+    0,
+    0,
+    bufferCanvas.value!.width,
+    bufferCanvas.value!.height
+  );
+
+  // Set font and styles.
+  {
+    bufferContext.font = "8px '04b20'";
+    bufferContext.fillStyle = settings.value.foreground;
+    bufferContext.textBaseline = "top";
+    bufferContext.textRendering = "geometricPrecision";
+    bufferContext.imageSmoothingEnabled = false;
+
+    renderContext.imageSmoothingEnabled = false;
+  }
+
+  // Draw text to buffer canvas.
+  let totalWidth = 1;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    bufferContext.fillText(char, Math.ceil(totalWidth), 0);
+
+    let metrics = bufferContext.measureText(char);
+    let characterWidth = Math.ceil(metrics.width);
+    totalWidth += characterWidth;
+  }
+
+  if (totalWidth > bufferCanvas.value!.width) {
+    status.value = "Text input too long! Buffer truncated.";
+    status.value = "Text input too long! Buffer truncated.";
+
+    totalWidth = bufferCanvas.value!.width;
+  }
+
+  // Calculate render canvas size.
+  renderCanvas.value!.width = totalWidth;
+  renderContext.drawImage(bufferCanvas.value!, 0, 0);
 };
 
+const publish = async () => {
+  status.value = "Publishing canvas.";
+
+  console.log(renderCanvas.value!.width);
+  if (renderCanvas.value!.width == 0 || renderCanvas.value!.height == 0) {
+    status.value = "Skipping empty buffer.";
+    return;
+  }
+
+  saveData();
+
+  const buffer = scoreboard.createBuffer(renderCanvas.value!, {
+    scrollSpeed: settings.value.scrollSpeed,
+    saveBuffer: true,
+  });
+
+  await fetch("http://webdev.local/buffer", {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: buffer,
+    signal: AbortSignal.timeout(5000),
+  })
+    .then((response) => {
+      if (response.status == 200) {
+        status.value = "Publish successful.";
+      } else {
+        status.value = "Publish failed!";
+      }
+    })
+    .catch((error) => {
+      if (error.name === "AbortError") {
+        status.value = "Fetch request timed out!";
+      } else {
+        status.value = "An error occurred!";
+        console.log(error);
+      }
+    });
+};
+
+const saveData = () => {
+  localStorage.setItem("settings", JSON.stringify(settings.value));
+};
+
+const loadData = () => {
+  const data = localStorage.getItem("settings");
+  if (data) {
+    settings.value = JSON.parse(data);
+  }
+};
+
+const handleDrop = (event: DragEvent) => {
+  const file = event.dataTransfer!.files[0];
+  if (file && file.type.startsWith("image/")) {
+    const droppedImage = new Image();
+    droppedImage.onload = () => {
+      const totalWidth = Math.min(
+        droppedImage.width,
+        bufferCanvas.value!.width
+      );
+      renderCanvas.value!.width = totalWidth;
+      renderContext.drawImage(droppedImage, 0, 0);
+    };
+    droppedImage.src = URL.createObjectURL(file);
+  }
+};
 </script>

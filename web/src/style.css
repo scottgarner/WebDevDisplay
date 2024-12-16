@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-zinc-800;
+}
+
+button {
+  @apply uppercase w-full sm:w-auto p-2 px-4 bg-blue-500 active:bg-blue-600 hover:bg-blue-400 text-white font-semibold rounded-md;
+}
+
+label {
+  @apply block text-zinc-300 text-xs my-2 uppercase;
+}
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transform: none;
+  -webkit-font-smoothing: none;
+}
