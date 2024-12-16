@@ -1,16 +1,8 @@
 #include "globals.h"
-#include "config.h"
-#include "lut_8x8.h"
 
-#define STRIPS 1
 #include <FastLED.h>
 
-int offsetX = 0;
-int offsetY = 0;
-
-int pins[STRIPS] = {32};
-
-uint8_t graphicsBuffer[16385];
+uint8_t graphicsBuffer[GRAPHICS_BUFFER_MAX];
 uint16_t graphicsBufferWidth = 0;
 uint16_t graphicsBufferHeight = 0;
 
@@ -18,8 +10,14 @@ uint8_t physicalBuffer[ROWS * COLUMNS * 3];
 
 bool refresh = false;
 
-long lastScrollTime = 0;
-int scrollDelta = 250;
+int scrollSpeedX = 0;
+int scrollSpeedY = 0;
+
+int offsetX = 0;
+int offsetY = 0;
+
+long lastScrollTimeY = 0;
+long lastScrollTimeX = 0;
 
 int wrap(int value, int divisor)
 {
@@ -28,6 +26,12 @@ int wrap(int value, int divisor)
 
 void graphicsToPhysical()
 {
+    if (graphicsBufferWidth == 0 || graphicsBufferHeight == 0)
+    {
+        Serial.println("Invalid graphics buffer dimensions.");
+        return;
+    }
+
     for (int y = 0; y < ROWS; y++)
     {
         for (int x = 0; x < COLUMNS; x++)
@@ -40,6 +44,7 @@ void graphicsToPhysical()
 
             // Get the physical positions from the LUT.
             int logicalIndex = y * COLUMNS + x;
+
             int physicalIndexRed = lut[logicalIndex] * 3;
             int physicalIndexGreen = lut[logicalIndex] * 3 + 1;
             int physicalIndexBlue = lut[logicalIndex] * 3 + 2;
@@ -52,76 +57,37 @@ void graphicsToPhysical()
             physicalBuffer[physicalIndexRed] = red;
             physicalBuffer[physicalIndexGreen] = green;
             physicalBuffer[physicalIndexBlue] = blue;
-            /*
-                        Serial.print(" COLUMN: ");
-                        Serial.print(x);
-                        Serial.print(" ROW: ");
-                        Serial.print(y);
-
-                        Serial.print(" Logical Index: ");
-                        Serial.print(logicalIndex);
-                        Serial.print(" Graphics Index: ");
-                        Serial.print(graphicsIndex);
-
-                        Serial.print(" Red: ");
-                        Serial.print(red);
-                        Serial.print(" Green: ");
-                        Serial.print(green);
-                        Serial.print(" Blue: ");
-                        Serial.print(blue);
-
-                        Serial.print(" Physical Index Red: ");
-                        Serial.print(physicalIndexRed);
-                        Serial.print(" Physical Index Green: ");
-                        Serial.print(physicalIndexGreen);
-                        Serial.print(" Physical Index Blue: ");
-                        Serial.print(physicalIndexBlue);
-
-                        Serial.println();
-            */
         }
     }
-    /*
-        for (int i = 0; i < ROWS * COLUMNS * 3; i++)
-        {
-            Serial.print(physicalBuffer[i]);
-            Serial.print(',');
-        }
-        Serial.println();
-    */
 }
 
 void loadBuffer()
 {
-    if (!LittleFS.begin(true))
-    {
-        Serial.println("Failed to mount LittleFS!");
-        return;
-    }
+    Serial.println("Loading saved buffer...");
 
-    PixelDataHeader *header;
     File file = LittleFS.open("/buffer.dat", FILE_READ);
 
     if (!file)
     {
-        Serial.println("Failed to open file for reading");
+        Serial.println("Failed to open file for reading.");
         return;
     }
 
-    size_t fileSize = file.size();           // Get the total size of the file
-    uint8_t *buffer = new uint8_t[fileSize]; // Dynamically allocate memory for the file contents
+    size_t fileSize = file.size();
+    uint8_t *buffer = new uint8_t[fileSize];
 
     if (!buffer)
     {
-        Serial.println("Failed to allocate memory for file data");
+        Serial.println("Failed to allocate memory for file data.");
         file.close();
         return;
     }
 
-    file.read(buffer, fileSize); // Read the entire file into the buffer
+    Serial.println("Reading buffer.");
+    file.read(buffer, fileSize);
     file.close();
 
-    displaySetBuffer(buffer, fileSize, false);
+    displaySetBuffer(buffer, fileSize);
 
     Serial.println("Buffer successfully loaded from LittleFS");
     delete[] buffer;
@@ -130,12 +96,6 @@ void loadBuffer()
 void saveBuffer(uint8_t *buffer, size_t bufferSize)
 {
     Serial.println("Save buffer!");
-
-    if (!LittleFS.begin(true))
-    {
-        Serial.println("LittleFS Mount Failed");
-        return;
-    }
 
     File file = LittleFS.open("/buffer.dat", FILE_WRITE);
     if (!file)
@@ -153,10 +113,16 @@ void displaySetup()
 {
     Serial.println("Display setup...");
 
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>((CRGB *)physicalBuffer, NUM_LEDS_PER_STRIP);
+    // 32, 33, 25, 26
+    FastLED.addLeds<NEOPIXEL, 32>((CRGB *)physicalBuffer, 0, LEDS_PER_STRIP);
+    FastLED.addLeds<NEOPIXEL, 33>((CRGB *)physicalBuffer, 1 * LEDS_PER_STRIP, LEDS_PER_STRIP);
+    FastLED.addLeds<NEOPIXEL, 25>((CRGB *)physicalBuffer, 2 * LEDS_PER_STRIP, LEDS_PER_STRIP);
+    FastLED.addLeds<NEOPIXEL, 26>((CRGB *)physicalBuffer, 3 * LEDS_PER_STRIP, LEDS_PER_STRIP);
+
     FastLED.setBrightness(BRIGHTNESS);
 
-    lastScrollTime = millis();
+    lastScrollTimeX = millis();
+    lastScrollTimeY = millis();
 
     graphicsBuffer[0] = 0;
     graphicsBuffer[1] = 0;
@@ -176,28 +142,27 @@ void displaySetup()
 
     loadBuffer();
 
-    refresh = true;
+    Serial.println("Prepping initial buffer.");
+    graphicsToPhysical();
+
+    Serial.println("Displaying initial buffer.");
+    FastLED.show();
 
     Serial.println("Display setup complete...");
 }
 
-void displaySetBuffer(uint8_t *buffer, size_t bufferSize, bool save = false)
+void displaySetBuffer(uint8_t *buffer, size_t bufferSize)
 {
-    saveBuffer(buffer, bufferSize);
 
     PixelDataHeader *header = (PixelDataHeader *)buffer;
     uint8_t *pixelData = buffer + sizeof(PixelDataHeader);
-    /*
-        Serial.print("Width: ");
-        Serial.println(header->width);
-        Serial.print("Height: ");
-        Serial.println(header->height);
-        Serial.print("Depth: ");
-        Serial.println(header->bitDepth);
-        Serial.println("Display set graphics buffer...");
-    */
 
-    // Ensure the buffer is not larger than the memory can handle
+    Serial.print("Width: ");
+    Serial.print(header->width);
+    Serial.print(" Height: ");
+    Serial.println(header->height);
+    Serial.print("\n");
+
     uint32_t pixelBufferSize = header->width * header->height * 3;
     if (pixelBufferSize > sizeof(graphicsBuffer))
     {
@@ -205,34 +170,70 @@ void displaySetBuffer(uint8_t *buffer, size_t bufferSize, bool save = false)
         return;
     }
 
+    if (header->saveBuffer)
+    {
+        header->saveBuffer = false;
+        saveBuffer(buffer, bufferSize);
+    }
+
     memcpy(graphicsBuffer, pixelData, bufferSize);
+
+    scrollSpeedX = header->scrollSpeedX;
+    scrollSpeedY = header->scrollSpeedY;
+
     graphicsBufferWidth = header->width;
     graphicsBufferHeight = header->height;
+
+    if (scrollSpeedX == 0)
+    {
+        offsetX = 0;
+    }
+
+    if (scrollSpeedY == 0)
+    {
+        offsetY = 0;
+    }
+
+    Serial.print(" Scroll speed X: ");
+    Serial.print(scrollSpeedX);
+    Serial.print(" Scroll speed Y: ");
+    Serial.println(scrollSpeedY);
 
     refresh = true;
 }
 
 void displayLoop()
 {
+    // X-axis scroll.
+    if (scrollSpeedX > 0)
+    {
+        uint scrollDeltaX = 1000 / scrollSpeedX;
+        if (millis() - scrollDeltaX > lastScrollTimeX)
+        {
+            offsetX = (offsetX + 1) % graphicsBufferWidth;
+            lastScrollTimeX = millis();
+            refresh = true;
+        }
+    }
+
+    // Y-axis scroll.
+    if (scrollSpeedY > 0)
+    {
+        uint scrollDeltaY = 1000 / scrollSpeedY;
+        if (millis() - scrollDeltaY > lastScrollTimeY)
+        {
+            offsetY = (offsetY + 1) % graphicsBufferHeight;
+            lastScrollTimeY = millis();
+            refresh = true;
+        }
+    }
+
+    // Refresh as needed.
     if (refresh)
     {
         graphicsToPhysical();
-        // driver.showPixels();
         FastLED.show();
-        // Serial.println("Refresh!");
+
         refresh = false;
-    }
-
-    if (millis() - lastScrollTime > scrollDelta)
-    {
-        lastScrollTime = millis();
-
-        if (graphicsBufferWidth > COLUMNS)
-        {
-            offsetX = (offsetX + 1) % graphicsBufferWidth;
-            refresh = true;
-        }
-
-        // offsetY = (offsetY + 1) % ROWS;
     }
 }
