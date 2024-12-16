@@ -1,12 +1,41 @@
+const panelRows = 1;
+const panelColumns = 4;
+
+const pixelRows = 10;
+const pixelColumns = 72;
+
 const logicalGrid: Number[][] = [];
 
-const panelRows = 1;
-const panelColumns = 1;
+for (let panelY = 0; panelY < panelRows; panelY++) {
+  for (let panelX = 0; panelX < panelColumns; panelX++) {
+    const panelIndex = panelColumns * panelY + panelX;
 
-const pixelRows = 8;
-const pixelColumns = 8;
+    for (let pixelY = 0; pixelY < pixelRows; pixelY++) {
+      const pixelRow: Number[] = [];
+      for (let pixelX = 0; pixelX < pixelColumns; pixelX++) {
+        const panelIndex = panelColumns * panelY + panelX;
+        const panelOffset = panelIndex * (pixelRows * pixelColumns);
 
-const zigzagByRow = false;
+        const index = pixelColumns * pixelY + pixelX + panelOffset;
+
+        if (pixelY % 2 == 0) {
+          pixelRow.push(index);
+          ``;
+        } else {
+          pixelRow.unshift(index);
+        }
+      }
+      const logicalRow = panelY * pixelRows + pixelY;
+      if (logicalGrid[logicalRow] == undefined) logicalGrid[logicalRow] = [];
+      logicalGrid[logicalRow].push(...pixelRow);
+    }
+  }
+}
+
+console.log(JSON.stringify(logicalGrid.flat()));
+
+/*
+const zigzagByRow = true;
 
 for (let panelY = 0; panelY < panelRows; panelY++) {
   for (let panelX = 0; panelX < panelColumns; panelX++) {
@@ -15,9 +44,6 @@ for (let panelY = 0; panelY < panelRows; panelY++) {
     for (let primary = 0; primary < pixelPrimaryLines; primary++) {
       const pixelLine: Number[] = [];
       for (let secondary = 0; secondary < pixelSecondaryLines; secondary++) {
-        const pixelX = zigzagByRow ? secondary : primary;
-        const pixelY = zigzagByRow ? primary : secondary;
-
         const panelIndex = panelColumns * panelY + panelX;
         const panelOffset = panelIndex * pixelRows * pixelColumns;
         const index = pixelSecondaryLines * primary + secondary + panelOffset;
@@ -32,23 +58,19 @@ for (let panelY = 0; panelY < panelRows; panelY++) {
           pixelLine.unshift(index);
         }
       }
-      logicalGrid[panelY * pixelPrimaryLines + primary].push(...pixelLine);
+      logicalGrid[panelY * pixelPrimaryLines + primary].unshift(...pixelLine);
     }
   }
 }
 
+console.log(logicalGrid.flat);
 if (zigzagByRow) {
-  console.log(logicalGrid.flat());
+  console.info(JSON.stringify(logicalGrid.flat()));
 } else {
   const invertedLogicalGrid: Number[][] = logicalGrid[0].map((_, x) =>
     logicalGrid.map((row) => row[x])
   );
-  console.log(invertedLogicalGrid.flat());
+  console.info(JSON.stringify(invertedLogicalGrid.flat()));
 }
 
-/*
-  0, 7, 8, 15, 16, 23, 24, 31,
-  1, 6, 9, 14, 17, 22, 25, 30,
-  2, 5, 10, 13, 18, 21, 26, 29,
-  3, 4, 11, 12, 19, 20, 27, 28
 */
