@@ -1,6 +1,5 @@
-data
-
 .pio
 .vscode
-credentials.h
 .DS_Store
+
+data
