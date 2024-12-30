@@ -101,20 +101,6 @@ onMounted(async () => {
   // Load local data.
   loadData();
 
-  // Load remote data.
-  {
-    await fetch("http://scoreboard.local/status")
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        bufferHeight = data.rows;
-      })
-      .catch((error) => {
-        status.value = "Can't pull remote data.";
-        console.log(error);
-      });
-  }
-
   // Configure canvases.
   {
     bufferCanvas.value!.width = 1024;
@@ -161,7 +147,7 @@ const generate = () => {
   {
     bufferContext.font = "8px '04b20'";
     bufferContext.fillStyle = settings.value.foreground;
-    bufferContext.textBaseline = "top";
+    bufferContext.textBaseline = "middle";
     bufferContext.textRendering = "geometricPrecision";
     bufferContext.imageSmoothingEnabled = false;
 
@@ -172,7 +158,7 @@ const generate = () => {
   let totalWidth = 1;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    bufferContext.fillText(char, Math.ceil(totalWidth), 0);
+    bufferContext.fillText(char, Math.ceil(totalWidth), bufferHeight / 2);
 
     let metrics = bufferContext.measureText(char);
     let characterWidth = Math.ceil(metrics.width);

@@ -19,6 +19,8 @@ int offsetY = 0;
 long lastScrollTimeY = 0;
 long lastScrollTimeX = 0;
 
+volatile bool updatingBuffer = false;
+
 int wrap(int value, int divisor)
 {
     return ((value % divisor) + divisor) % divisor;
@@ -153,6 +155,7 @@ void displaySetup()
 
 void displaySetBuffer(uint8_t *buffer, size_t bufferSize)
 {
+    updatingBuffer = true;
 
     PixelDataHeader *header = (PixelDataHeader *)buffer;
     uint8_t *pixelData = buffer + sizeof(PixelDataHeader);
@@ -200,6 +203,8 @@ void displaySetBuffer(uint8_t *buffer, size_t bufferSize)
     Serial.println(scrollSpeedY);
 
     refresh = true;
+
+    updatingBuffer = false;
 }
 
 void displayLoop()
@@ -229,7 +234,7 @@ void displayLoop()
     }
 
     // Refresh as needed.
-    if (refresh)
+    if (!updatingBuffer && refresh)
     {
         graphicsToPhysical();
         FastLED.show();
