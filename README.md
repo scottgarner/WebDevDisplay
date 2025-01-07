@@ -2,6 +2,11 @@
 
 This document provides an overview of the custom display and its inner workings.
 
+## TLDR
+
+1. Connect to the `webdev` access point to configure WiFi credentials. (A reboot may be necessary after connecting).
+2. Visit `webdev.local` in a web browser.
+
 ## Embedded Code
 
 This project uses Platform.IO to build and deploy to an ESP32 on a custom breakout board. The embedded code is responsible for managing networking and display layers for pixel data.
@@ -19,7 +24,7 @@ In addition to buffer reception/processing described above the networking layer 
 
 - WiFiManager - Handles first-time setup when connecting to a new access point.
 - ArduinoOTA - Allows for remote upload of embedded code and filesystem data.
-- ESPAsyncWebServer - The web server library that handle incoming data and serve status/filesystem data.
+- ESPAsyncWebServer - The web server library that handles incoming data and serve status/filesystem data.
 - ESPmDNS - Exposes the host on the local networking using mDNS.
 
 ### Display Layer
@@ -40,7 +45,7 @@ struct PixelDataHeader
 {
     uint16_t mode;          // Reserved for support of different "modes".
     uint16_t width;         // Pixel width of the buffer.
-    uint16_t height;        // Pixel height of the bufer.
+    uint16_t height;        // Pixel height of the buffer.
     uint16_t scrollSpeedX;  // Scroll speed in pixels/second on X.
     uint16_t scrollSpeedY;  // Scroll speed in pixels/second on Y.
     uint16_t saveBuffer;    // Optionally save buffer, which is slow.
