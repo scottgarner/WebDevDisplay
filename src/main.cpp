@@ -9,12 +9,12 @@ void setup()
     Serial.println("An Error has occurred while mounting LittleFS!");
   }
 
-  networkingSetup();
   displaySetup();
+  networkingSetup();
 }
 
 void loop()
 {
-  networkingLoop();
   displayLoop();
+  networkingLoop();
 }
