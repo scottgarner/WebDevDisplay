@@ -55,6 +55,10 @@ The resulting buffer can then be posted to `/buffer` or sent via a WebSocket con
 
 ## Notes/Caveats
 
+### Software/Filesystem Updates
+
+- All tasks related to the microcontroller _should_ be possible over WiFi, but if it becomes unresponsive for some reason it can be reprogrammed via USB. **Do not connect to the USB port on the ESP32 without first disconnecting the 5V power on the PCB.**
+
 ### Refresh Rate and Animation
 
 Users can create animations by sending sequential image buffers at a fixed interval, though note the following limitations.
@@ -62,7 +66,7 @@ Users can create animations by sending sequential image buffers at a fixed inter
 - In the current design, the image buffers are fully uncompressed and take a non-trivial amount of time to send over the ESP32's relatively slow WiFi connection. This speed is better over WebSockets than HTTP POST because of less overhead.
 - Updating the LEDs themselves takes time given the length of the individual strips. As such, there's likely a hard cap to the framerate of 30-45 pixels without physically reworking the electronics.
 
-If animation becomes a major focus, a major speed boost would come from reworking the software to use 8bit color buffers instead of 24bit color buffers.
+* If animation becomes a major focus, a major speed boost would come from reworking the software to use 8bit color buffers instead of 24bit color buffers.
 
 ### Heat/Safety Concerns
 
