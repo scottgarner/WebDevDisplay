@@ -7,7 +7,7 @@ export class Scoreboard {
   createBuffer(
     canvas: HTMLCanvasElement,
     options: ScoreboardOptions = {}
-  ): Uint16Array {
+  ): Uint8Array {
     const header = new Uint16Array([
       0, // Currently not used.
       canvas.width, // Width.
