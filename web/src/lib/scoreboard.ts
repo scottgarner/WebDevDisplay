@@ -34,8 +34,6 @@ export class Scoreboard {
           imageData.data[index + 1]; // Green
         buffer[header.byteLength + (i * canvas.width + j) * 3 + 2] =
           imageData.data[index + 2]; // Blue
-
-        console.log(imageData.data[index]);
       }
     }
 
