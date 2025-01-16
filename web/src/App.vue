@@ -97,6 +97,9 @@ const settings = ref<Settings>({
   scrollSpeed: 0,
 });
 
+// Tokens for text replacement during publish.
+const textReplacements = new Map<string, string>();
+
 onMounted(async () => {
   // Load local data.
   loadData();
@@ -116,11 +119,18 @@ onMounted(async () => {
 
   // Load font.
   {
-    const font = new FontFace("04b20", "url(/fonts/04B_20__.woff2)");
+    // const font = new FontFace("ScoreboardFont", "url(/fonts/04B_20__.woff2)");
+    const font = new FontFace("ScoreboardFont", "url(/fonts/BoldPixels.ttf)");
     await font.load();
     document.fonts.add(font);
-    console.log([...document.fonts].map((f) => f.family));
   }
+
+  // Example interval for updating on a timer.
+  setInterval(() => {
+    textReplacements.set("{{time}}", new Date().toLocaleTimeString());
+    generate();
+    publish();
+  }, 1000);
 
   // Generate initial canvas.
   generate();
@@ -131,8 +141,13 @@ onMounted(async () => {
 const generate = () => {
   status.value = "Generating canvas.";
 
-  const text = settings.value.text;
+  let text = settings.value.text;
   if (!text) return;
+
+  // Loop through replacements and apply them.
+  textReplacements.forEach((value, key) => {
+    text = text.replace(key, value);
+  });
 
   // Clear buffer.
   bufferContext.fillStyle = settings.value.background;
@@ -145,9 +160,9 @@ const generate = () => {
 
   // Set font and styles.
   {
-    bufferContext.font = "8px '04b20'";
+    bufferContext.font = "8px 'ScoreboardFont'";
     bufferContext.fillStyle = settings.value.foreground;
-    bufferContext.textBaseline = "middle";
+    bufferContext.textBaseline = "baseline";
     bufferContext.textRendering = "geometricPrecision";
     bufferContext.imageSmoothingEnabled = false;
 
@@ -158,7 +173,7 @@ const generate = () => {
   let totalWidth = 1;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    bufferContext.fillText(char, Math.ceil(totalWidth), bufferHeight / 2);
+    bufferContext.fillText(char, Math.ceil(totalWidth), bufferHeight - 1);
 
     let metrics = bufferContext.measureText(char);
     let characterWidth = Math.ceil(metrics.width);
@@ -166,7 +181,6 @@ const generate = () => {
   }
 
   if (totalWidth > bufferCanvas.value!.width) {
-    status.value = "Text input too long! Buffer truncated.";
     status.value = "Text input too long! Buffer truncated.";
 
     totalWidth = bufferCanvas.value!.width;
@@ -180,7 +194,6 @@ const generate = () => {
 const publish = async () => {
   status.value = "Publishing canvas.";
 
-  console.log(renderCanvas.value!.width);
   if (renderCanvas.value!.width == 0 || renderCanvas.value!.height == 0) {
     status.value = "Skipping empty buffer.";
     return;
